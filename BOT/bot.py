@@ -44,7 +44,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_registered:
         if text == "Registro":
             context.user_data["step"] = {"stage": "name"}
-            await update.message.reply_text("Por favor, envía tu nombre y apellido:")
+            await update.message.reply_text("Por favor, envía tu nombre:")
         elif text == "Información":
             await info(update, context)
         else:
