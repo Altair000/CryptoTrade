@@ -1,6 +1,6 @@
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
-from config import BotConfig
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, Filters, ContextTypes
+from bot.config import BotConfig
 import requests
 import re
 
@@ -41,14 +41,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = response.json()
     is_registered = response.status_code == 200 and data.get("exists")
 
+    # Si el usuario no está registrado
     if not is_registered:
         if text == "Registro":
             context.user_data["step"] = {"stage": "name"}
-            await update.message.reply_text("Por favor, envía tu nombre:")
+            await update.message.reply_text("Por favor, envía tu nombre y apellido:")
         elif text == "Información":
             await info(update, context)
         else:
+            # Si no es un botón, pero estamos en proceso de registro, no hacer nada aquí
+            if "stage" in context.user_data["step"]:
+                return  # Delegar al manejador 'register'
             await update.message.reply_text("Por favor, usa los botones.", reply_markup=not_registered_keyboard)
+    # Si el usuario está registrado
     else:
         if text == "VIP":
             await vip(update, context)
@@ -59,9 +64,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif text == "Información":
             await info(update, context)
         else:
-            # Manejo de pasos para crear oferta
-            step = context.user_data.get("step", {})
-            if step.get("stage") in ["offer_amount", "offer_min", "offer_max", "offer_comment"]:
+            # Si estamos en el proceso de crear oferta, delegar a process_offer_step
+            if context.user_data["step"].get("stage") in ["offer_amount", "offer_min", "offer_max", "offer_comment"]:
                 await process_offer_step(update, context)
             else:
                 await update.message.reply_text("Por favor, usa los botones.", reply_markup=registered_keyboard)
@@ -263,8 +267,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(BotConfig.TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, register))
+    app.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+    # Manejador específico para el proceso de registro
+    app.add_handler(MessageHandler(Filters.text & ~Filters.command, register))
     app.add_handler(CallbackQueryHandler(button_callback))
     app.run_polling()
 
